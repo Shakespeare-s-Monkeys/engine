@@ -104,3 +104,23 @@ dist
 
 # TernJS port file
 .tern-port
+.yarn
+.inc-builds
+src/pages/s-10.md
+src/pages/s-11.md
+src/pages/s-12.md
+src/pages/s-13.md
+src/pages/s-14.md
+src/pages/s-15.md
+src/pages/s-16.md
+src/pages/s-17.md
+src/pages/s-18.md
+src/pages/s-19.md
+src/pages/s-2.md
+src/pages/s-20.md
+src/pages/s-3.md
+src/pages/s-4.md
+src/pages/s-5.md
+src/pages/s-6.md
+src/pages/s-7.md
+src/pages/s-9.md

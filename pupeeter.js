@@ -6,6 +6,8 @@ const { setTimeout } = require(`timers/promises`)
 const http = require(`http`)
 const prettyMilliseconds = require(`pretty-ms`)
 const asciichart = require(`asciichart`)
+const { parse } = require(`node-html-parser`)
+const got = require(`got`)
 
 function hitWebhook() {
   const options = {
@@ -64,32 +66,47 @@ const is404 = async ({ pagePath, rootUrl }) => {
 const waitForChange = async ({ selector, value, pagePath, rootUrl }) => {
   let finished = false
   async function loop() {
-    const browser = await puppeteer.launch()
+    const pageURL = `${rootUrl}${pagePath}`
 
-    const page = await browser.newPage()
-    const response = await page.goto(`${rootUrl}${pagePath}`)
-    console.log(`page ${pagePath} statusCode: ${response.status()}`)
-    // If it's a 404 page, exit loop and try again.
-    if (response.status() === 404) {
-      return false
-    }
-
-    await page.waitForFunction(
-      `document.getElementById("gatsby-focus-wrapper")`
-    )
-
-    let element
+    let html
     try {
-      element = await page.waitForSelector(selector, { timeout: 1500 })
-    } catch (e) {
-      return states.FAILED
+      html = await got(pageURL).text()
+    } catch {
+      // Ignore 404 errors and just return
+      return
     }
-    const value = await element.evaluate((el) => el.textContent)
-    const now = Date.now()
-    const diff = now - last
-    last = now
 
-    await browser.close()
+    const root = parse(html)
+
+    const value = root.querySelector(selector)?.rawText
+    return value
+
+    // const browser = await puppeteer.launch()
+
+    // const page = await browser.newPage()
+    // const response = await page.goto(`${rootUrl}${pagePath}`)
+    // console.log(`page ${pagePath} statusCode: ${response.status()}`)
+    // // If it's a 404 page, exit loop and try again.
+    // if (response.status() === 404) {
+    // return false
+    // }
+
+    // await page.waitForFunction(
+    // `document.getElementById("gatsby-focus-wrapper")`
+    // )
+
+    // let element
+    // try {
+    // element = await page.waitForSelector(selector, { timeout: 1500 })
+    // } catch (e) {
+    // return states.FAILED
+    // }
+    // const value = await element.evaluate((el) => el.textContent)
+    // const now = Date.now()
+    // const diff = now - last
+    // last = now
+
+    // await browser.close()
 
     return value
   }
