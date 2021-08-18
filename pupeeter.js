@@ -8,6 +8,7 @@ const prettyMilliseconds = require(`pretty-ms`)
 const asciichart = require(`asciichart`)
 const { parse } = require(`node-html-parser`)
 const got = require(`got`)
+const logger = require(`pino`)({ level: `debug` })
 
 function hitWebhook() {
   const options = {
@@ -18,7 +19,7 @@ function hitWebhook() {
   }
 
   const req = http.request(options, (res) => {
-    // console.log(`statusCode: ${res.statusCode}`)
+    // logger.info(`statusCode: ${res.statusCode}`)
 
     res.on(`data`, (d) => {
       process.stdout.write(d)
@@ -26,7 +27,7 @@ function hitWebhook() {
   })
 
   req.on(`error`, (error) => {
-    console.error(error)
+    logger.error(error)
   })
 
   req.end()
@@ -46,8 +47,7 @@ const is404 = async ({ pagePath, rootUrl }) => {
 
     const page = await browser.newPage()
     const response = await page.goto(`${rootUrl}${pagePath}`)
-    console.log(`deleted page ${pagePath} statusCode: ${response.status()}`)
-    console.trace()
+    logger.debug(`deleted page ${pagePath} statusCode: ${response.status()}`)
     // If it's a 404 page, exit loop and try again.
     return response.status()
   }
@@ -85,7 +85,7 @@ const waitForChange = async ({ selector, value, pagePath, rootUrl }) => {
 
     // const page = await browser.newPage()
     // const response = await page.goto(`${rootUrl}${pagePath}`)
-    // console.log(`page ${pagePath} statusCode: ${response.status()}`)
+    // logger.info(`page ${pagePath} statusCode: ${response.status()}`)
     // // If it's a 404 page, exit loop and try again.
     // if (response.status() === 404) {
     // return false
@@ -112,13 +112,14 @@ const waitForChange = async ({ selector, value, pagePath, rootUrl }) => {
   }
 
   while (!finished) {
+    // logger.info({ value })
     const latestValue = await loop()
     if (latestValue === states.FAILED) {
       finished = true
       return states.FAILED
     }
     if (value === latestValue) {
-      // console.log({value, latestValue})
+      // logger.info({value, latestValue})
       finished = true
       return states.COMPLETED
     }
@@ -183,7 +184,7 @@ async function engine() {
   let tickCount = 0
   async function tick() {
     tickCount += 1
-    console.log({ tickCount, operationsCount: config.operationsCount })
+    logger.debug({ tickCount, operationsCount: config.operationsCount })
     if (tickCount > config.operationsCount) {
       finishedStartingOperations = true
       timer.clearInterval()
@@ -216,7 +217,7 @@ async function engine() {
     const { selector, value, pagePath } = await actor[operation.verb](
       operation.id
     )
-    console.log(`operation "${operation.verb}" started for ${pagePath}`)
+    logger.debug(`operation "${operation.verb}" started for ${pagePath}`)
     const start = Date.now()
 
     let result
@@ -239,7 +240,7 @@ async function engine() {
     const end = Date.now()
     operation.state = result
     operation.elapsed = end - start
-    console.log(
+    logger.debug(
       `operation "${
         operation.verb
       }" completed for ${pagePath} in ${prettyMilliseconds(end - start)}`
@@ -249,7 +250,7 @@ async function engine() {
       onExit()
     } else {
       const stateGroups = _.groupBy(operations.map((op) => op.state))
-      console.log(
+      logger.debug(
         { finishedStartingOperations },
         operations.length,
         Object.entries(stateGroups).map(
@@ -263,19 +264,20 @@ async function engine() {
     const endRun = Date.now()
     const runTime = endRun - startRun
 
-    console.log(`Run finished and took ${prettyMilliseconds(runTime)}`)
-    console.log(
+    logger.info(`Run finished and took ${prettyMilliseconds(runTime)}`)
+    logger.info(
       `Average time / operation: ${prettyMilliseconds(
         _.sumBy(operations, (op) => op.elapsed) / operations.length
       )}`
     )
-    console.log(
-      asciichart.plot(
-        operations.map((op) => op.elapsed),
-        { height: 6 }
-      )
+    logger.info(
+      `\n` +
+        asciichart.plot(
+          operations.map((op) => op.elapsed),
+          { height: 6 }
+        )
     )
-    console.log(operations)
+    logger.debug(operations)
     process.exit()
   }
 }
