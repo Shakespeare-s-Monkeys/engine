@@ -13,6 +13,8 @@ jobs:
           node-version: '14'
           registry-url: 'https://registry.npmjs.org'
           cache: 'yarn'
+      - run: npm install -g yarn
+      - run: yarn set berry
       - run: yarn install
       # - run: yarn test
       - run: npm publish --ignore-scripts
