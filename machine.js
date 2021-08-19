@@ -10,12 +10,16 @@ const util = require(`util`)
 const fs = require(`fs-extra`)
 const got = require(`got`)
 const { parse } = require(`node-html-parser`)
+const { setTimeout } = require(`timers/promises`)
+const NanoTimer = require(`nanotimer`)
+const prettyMilliseconds = require(`pretty-ms`)
+const asciichart = require(`asciichart`)
+const _ = require(`lodash`)
 
 async function createFileService(id) {
-  console.log(`in createFileService`)
   const newValue = Math.random()
   await fs.writeFile(
-    `./src/pages/${id}.md`,
+    `./src/pages/s-${id}.md`,
     `---
 title: "${newValue}"
 ---
@@ -25,22 +29,20 @@ sup`
 
   return {
     selector: `#title`,
-    pagePath: `/${id}`,
+    pagePath: `/s-${id}`,
     value: newValue.toString(),
   }
 }
 
 const checkIfDeployed = async ({ selector, pagePath, rootUrl }) => {
   const pageURL = `${rootUrl}${pagePath}`
-  console.log({ pageURL })
 
   let response
   try {
     response = await got(pageURL)
   } catch (e) {
-    console.log(e)
     // Ignore 404 errors and just return
-    return { statusCode: response.statusCode }
+    return { statusCode: e.response.statusCode }
   }
 
   const root = parse(response.body)
@@ -59,39 +61,108 @@ async function checkOperation(id) {
   })
 }
 
+let idCounter = 0
+function getNextId() {
+  idCounter += 1
+  return idCounter
+}
+
 function createEngineMachine(context) {
   return createMachine({
-    id: `operation`,
+    id: `engine`,
+    strict: true,
     initial: `running`,
     context: {
       operations: [],
       nodes: [],
       interval: 10,
-      operationsCount: 20,
+      operationsLimit: 20,
       rootUrl: ``,
+      createdAt: Date.now(),
       ...context,
     },
     states: {
-      running: {},
+      running: {
+        invoke: {
+          src: (context) => (cb) => {
+            const timer = new NanoTimer()
+            timer.setInterval(() => cb(`TICK`), ``, `${context.interval}s`)
+
+            return () => {
+              timer.clearInterval()
+            }
+          },
+        },
+        always: [
+          {
+            target: `done`,
+            cond: (context) => {
+              const readyToBeDone =
+                context.operations.length >= context.operationsLimit &&
+                !context.operations.some((op) => op.state.value !== `completed`)
+
+              console.log(
+                context.operations.length,
+                context.operationsLimit,
+                context.operations.map((op) => op.state.value)
+              )
+              console.log(`running`, { readyToBeDone })
+
+              return readyToBeDone
+            },
+          },
+        ],
+        on: {
+          TICK: {
+            actions: assign({
+              operations: (context) => {
+                if (context.operations.length < context.operationsLimit) {
+                  console.log(`creating operation`)
+                  const newOperation = spawn(
+                    createOperationMachine({
+                      id: getNextId(),
+                      verb: `create`,
+                      rootUrl: context.rootUrl,
+                    }),
+                    {
+                      // sync: true,
+                    }
+                  )
+                  return [...context.operations, newOperation]
+                } else {
+                  return context.operations
+                }
+              },
+            }),
+          },
+        },
+      },
+      done: {
+        type: `final`,
+        entry: (context) => {
+          console.log(`I'm done`)
+          console.log(context)
+          const completedAt = Date.now()
+          const runTime = completedAt - context.createdAt
+
+          console.log(`Run finished and took ${prettyMilliseconds(runTime)}`)
+          console.log(
+            `Average time / operation: ${prettyMilliseconds(
+              _.sumBy(context.operations, (op) => op.state.context.latency) /
+                context.operations.length
+            )}`
+          )
+          console.log(
+            `\n` +
+              asciichart.plot(
+                context.operations.map((op) => op.state.context.latency),
+                { height: 6 }
+              )
+          )
+        },
+      },
     },
     on: {
-      TICK: {
-        actions: assign({
-          operations: (context) => {
-            const newOperation = spawn(
-              createOperationMachine({
-                id: 1,
-                verb: `create`,
-                rootUrl: context.rootUrl,
-              }),
-              {
-                // sync: true,
-              }
-            )
-            return [...context.operations, newOperation]
-          },
-        }),
-      },
       NODE_UPDATED: {
         actions: assign({
           nodes: (context, event) => {
@@ -99,6 +170,26 @@ function createEngineMachine(context) {
           },
         }),
       },
+      // OPERATION_COMPLETED: [
+      // {
+      // target: `done`,
+      // cond: (context) => {
+      // const readyToBeDone =
+      // context.operations.length >= context.operationsLimit &&
+      // !context.operations.some((op) => op.state.value === `running`)
+
+      // console.log(
+      // context.operations.length,
+      // context.operationsLimit,
+      // context.operations.some((op) => op.state.value === `running`)
+      // )
+      // console.log(`OPERATION_COMPLETED`, { readyToBeDone })
+
+      // return readyToBeDone
+      // },
+      // },
+      // { target: `waiting` },
+      // ],
     },
   })
 }
@@ -106,13 +197,15 @@ function createEngineMachine(context) {
 function createOperationMachine(context) {
   return createMachine({
     id: `operation`,
-    initial: `operating`,
-    context: { ...context, createdAt: Date.now() },
+    strict: true,
+    initial: `running`,
+    context: { ...context, createdAt: Date.now(), checks: [], checkCount: 0 },
     states: {
-      operating: {
+      running: {
         invoke: {
           id: `runOperation`,
           src: (context) => {
+            console.log({ context })
             switch (context.verb) {
               case `create`:
                 return createFileService(context.id)
@@ -154,7 +247,11 @@ function createOperationMachine(context) {
                 rootUrl: context.rootUrl,
               })
               if (res.statusCode !== 200 || res.value !== context.node.value) {
-                callback({ type: `FAILED_CHECK`, res })
+                callback({
+                  type: `FAILED_CHECK`,
+                  res: { ...res, timestamp: Date.now() },
+                })
+                await setTimeout(50)
               } else {
                 finished = true
                 callback({ type: `SUCCESS`, res })
@@ -164,13 +261,16 @@ function createOperationMachine(context) {
         },
         on: {
           FAILED_CHECK: {
-            actions: (_, event) => console.log(`got TEST`, event),
+            actions: assign({
+              checks: (context, event) => [...context.checks, event.res],
+              checkCount: (context) => (context.checkCount += 1),
+            }),
           },
           SUCCESS: {
             target: `completed`,
             actions: assign({
               completedAt: Date.now(),
-              elapsed: (context) => Date.now() - context.createdAt,
+              latency: (context) => Date.now() - context.createdAt,
             }),
           },
         },
@@ -178,9 +278,21 @@ function createOperationMachine(context) {
 
       completed: {
         type: `final`,
+        entry: sendParent(() => {
+          const action = {
+            type: `OPERATION_COMPLETED`,
+          }
+          return action
+        }),
       },
       failure: {
         type: `final`,
+        entry: sendParent(() => {
+          const action = {
+            type: `OPERATION_FAILED`,
+          }
+          return action
+        }),
       },
     },
   })
@@ -192,6 +304,7 @@ function createOperationMachine(context) {
 // TODO still
 // on shutdown, engine create delete operations for nodes.
 // log everything w/ Pino & child loggers
+// make operationsLimit work — scale up the number of nodes and then start deleting them.
 // then refactor all this code to the engine proper & rework the markdown example with the engine.
 
 const nodeMachine = createMachine({
@@ -219,18 +332,20 @@ const nodeMachine = createMachine({
 const engineService = interpret(
   createEngineMachine({
     interval: 1,
+    operationsLimit: 10,
     rootUrl: `http://localhost:9000`,
   })
 ).onTransition((state) =>
   console.log(
     `engine transition`,
+    state.value,
     state.event.type,
     `operations`,
     util.inspect(
       state.context.operations.map((o) => {
         return {
           value: o.state.value,
-          context: o.state.context,
+          // context: o.state.context,
         }
       }),
       false,
@@ -238,11 +353,10 @@ const engineService = interpret(
       true /* enable colors */
     ),
     `nodes`,
-    util.inspect(state.context.nodes, false, null, true /* enable colors */)
+    state.context.nodes.length
+    // util.inspect(state.context.nodes, false, null, true [> enable colors <])
   )
 )
 
 // Start the service
 engineService.start()
-
-engineService.send({ type: `TICK` })
