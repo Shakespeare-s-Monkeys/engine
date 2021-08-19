@@ -23,31 +23,6 @@ const createResSchema = Joi.object({
   value: Joi.any().required(),
 })
 
-async function createFileService(id) {
-  const newValue = Math.random()
-  await fs.writeFile(
-    `./src/pages/s-${id}.md`,
-    `---
-title: "${newValue}"
----
-
-sup`
-  )
-
-  return {
-    selector: `#title`,
-    pagePath: `/s-${id}`,
-    value: newValue.toString(),
-  }
-}
-async function deleteFileService(id) {
-  await fs.unlink(`./src/pages/s-${id}.md`)
-
-  return {
-    pagePath: `/s-${id}`,
-  }
-}
-
 const checkIf404 = async ({ pagePath, rootUrl }) => {
   const pageURL = `${rootUrl}${pagePath}`
 
@@ -148,13 +123,13 @@ function createEngineMachine(context) {
                   // If we haven't created all the nodes (1/2 of total operations),
                   // create a node.
 
-                  // console.log(
-                  // `hit limit of node creation`,
-                  // Object.keys(context.nodes).length <
-                  // context.operationsLimit / 2,
-                  // Object.keys(context.nodes).length,
-                  // context.operationsLimit / 2
-                  // )
+                  console.log(
+                    `not hit limit of node creation`,
+                    Object.keys(context.nodes).length <
+                      context.operationsLimit / 2,
+                    Object.keys(context.nodes).length,
+                    context.operationsLimit / 2
+                  )
                   if (
                     Object.keys(context.nodes).length <
                     context.operationsLimit / 2
@@ -246,6 +221,7 @@ function createEngineMachine(context) {
 
 // TODO Split into create & delete operations
 function createOperationMachine(context) {
+  console.log(`createOperationMachine`, context)
   return createMachine({
     id: `operation`,
     strict: true,
@@ -268,9 +244,12 @@ function createOperationMachine(context) {
         invoke: {
           id: `runOperation`,
           src: async (context) => {
+            console.log(`HELLO`)
             switch (context.verb) {
               case `create`:
+                console.log(context.operators.create)
                 const res = await context.operators.create(context.id)
+                console.log(res)
                 const validation = createResSchema.validate(res)
                 if (validation.error) {
                   console.log(
@@ -409,11 +388,10 @@ function createOperationMachine(context) {
 
 // invoke service to create file and return to operation and it returns it to engine
 // operation machine invokes check callback service which responds with events of failed and success checks
+// make operationsLimit work — scale up half the number of nodes and then start deleting them.
 //
 // TODO still
-// on shutdown, engine create delete operations for nodes.
 // log everything w/ Pino & child loggers
-// make operationsLimit work — scale up half the number of nodes and then start deleting them.
 // then refactor all this code to the engine proper & rework the markdown example with the engine.
 
 const nodeMachine = createMachine({
