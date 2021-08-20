@@ -132,7 +132,7 @@ function createEngineMachine(context) {
                     const id = getNextId()
                     const newOperation = spawn(
                       createOperationMachine({
-                        id,
+                        id: `create-${id}`,
                         node: {
                           id,
                         },
@@ -237,7 +237,7 @@ function createOperationMachine(context) {
             switch (context.verb) {
               case `create`:
                 // console.log(context.operators.create)
-                const res = await context.operators.create(context.id)
+                const res = await context.operators.create(context.node.id)
                 // console.log(res)
                 const validation = createResSchema.validate(res)
                 if (validation.error) {
