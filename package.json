@@ -1,7 +1,7 @@
 {
   "name": "shakespeares-monkeys",
   "description": "Engine for Shakespeare's Monkeys",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "author": "Kyle Mathews",
   "dependencies": {
     "asciichart": "^1.5.25",
@@ -23,24 +23,14 @@
     "eslint-config-react": "^1.1.7",
     "eslint-plugin-prettier": "^3.4.0",
     "execa": "^5.1.1",
-    "gatsby": "^3.11.1",
-    "gatsby-source-filesystem": "^3.11.0",
-    "gatsby-transformer-remark": "^4.8.0",
     "jest": "^27.0.6",
-    "prettier": "^2.3.2",
-    "puppeteer": "^10.2.0",
-    "react": "^17.0.1",
-    "react-dom": "^17.0.1"
+    "prettier": "^2.3.2"
   },
   "keywords": [
     "gatsby"
   ],
   "packageManager": "yarn@3.0.1",
   "scripts": {
-    "build": "gatsby build",
-    "clean": "gatsby clean",
-    "develop": "gatsby develop",
-    "serve": "gatsby serve",
-    "start": "gatsby develop"
+    "test": "jest"
   }
 }
