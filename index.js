@@ -305,7 +305,7 @@ function createOperationMachine(context) {
                 })
                 if (
                   res.statusCode !== 200 ||
-                  res.value !== context.node.value
+                  res.value?.toString() !== context.node.value.toString()
                 ) {
                   callback({
                     type: `FAILED_CHECK`,
