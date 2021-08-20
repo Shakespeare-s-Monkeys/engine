@@ -78,6 +78,10 @@ function createEngineMachine(context) {
       running: {
         invoke: {
           src: (context) => (cb) => {
+            // Create the first TICK event immediately.
+            cb(`TICK`)
+
+            // Setup next ticks based on interval choosen by config.
             const timer = new NanoTimer()
             timer.setInterval(() => cb(`TICK`), ``, `${context.interval}s`)
 
