@@ -20,6 +20,7 @@ const createResSchema = Joi.object({
   pagePath: Joi.string().required(),
   selector: Joi.string().required(),
   value: Joi.any().required(),
+  context: Joi.object()
 })
 
 const checkIf404 = async ({ pagePath, rootUrl }) => {
