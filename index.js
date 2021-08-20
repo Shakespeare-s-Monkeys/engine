@@ -409,26 +409,26 @@ exports.run = (config, cb) => {
   const engineService = interpret(createEngineMachine(config)).onTransition(
     (state) => {
       cb(state)
-      console.log(
-        `engine transition`,
-        state.value,
-        state.event.type,
-        `operations`,
-        util.inspect(
-          state.context.operations.map((o) => {
-            return {
-              value: o.state.value,
-              // context: o.state.context,
-            }
-          }),
-          false,
-          null,
-          true /* enable colors */
-        ),
-        `nodes`,
-        Object.keys(state.context.nodes).length,
-        util.inspect(state.context.nodes, false, null, true)
-      )
+      // console.log(
+        // `engine transition`,
+        // state.value,
+        // state.event.type,
+        // `operations`,
+        // util.inspect(
+          // state.context.operations.map((o) => {
+            // return {
+              // value: o.state.value,
+              // // context: o.state.context,
+            // }
+          // }),
+          // false,
+          // null,
+          // true [> enable colors <]
+        // ),
+        // `nodes`,
+        // Object.keys(state.context.nodes).length,
+        // util.inspect(state.context.nodes, false, null, true)
+      // )
     }
   )
 
