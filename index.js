@@ -249,7 +249,7 @@ function createOperationMachine(context) {
                 }
                 return res
               case `delete`:
-                await context.operators.delete(context.node.id)
+                await context.operators.delete(context.node)
                 return context.node
               default:
               // code block

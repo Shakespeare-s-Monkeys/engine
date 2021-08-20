@@ -35,8 +35,8 @@ it(`can create nodes, check if they exist, and then delete nodes and check they'
     }
   }
 
-  async function deleteOperator(id) {
-    nodes.delete(id.toString())
+  async function deleteOperator(node) {
+    nodes.delete(node.id.toString())
     deleteOperatorCallCount += 1
     return
   }
