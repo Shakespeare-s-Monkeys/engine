@@ -5,7 +5,7 @@ const fs = require(`fs-extra`)
 const execa = require(`execa`)
 const path = require(`path`)
 
-it(`can create nodes, check if they exist, and then delete nodes and check they're gone`, async (done) => {
+it(`can create nodes, check if they exist, and then delete nodes and check they're gone`, (done) => {
   const nodes = new Set()
   let serverCalled = false
   let createOperatorCallCount = 0
