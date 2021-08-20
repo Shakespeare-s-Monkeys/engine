@@ -1,4 +1,4 @@
-const { createEngineMachine } = require(`../machine`)
+const { createEngineMachine } = require(`../`)
 const http = require(`http`)
 const { interpret } = require(`xstate`)
 const fs = require(`fs-extra`)

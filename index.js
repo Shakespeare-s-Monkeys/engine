@@ -13,7 +13,6 @@ const { parse } = require(`node-html-parser`)
 const { setTimeout } = require(`timers/promises`)
 const NanoTimer = require(`nanotimer`)
 const prettyMilliseconds = require(`pretty-ms`)
-const asciichart = require(`asciichart`)
 const _ = require(`lodash`)
 const Joi = require(`joi`)
 
@@ -53,14 +52,6 @@ const checkIfDeployed = async ({ selector, pagePath, rootUrl }) => {
   const value = root.querySelector(selector)?.rawText
 
   return { value, statusCode: response.statusCode }
-}
-
-async function checkOperation(id) {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({ completed: true })
-    }, 1000)
-  })
 }
 
 let idCounter = 0
@@ -123,13 +114,13 @@ function createEngineMachine(context) {
                   // If we haven't created all the nodes (1/2 of total operations),
                   // create a node.
 
-                  console.log(
-                    `not hit limit of node creation`,
-                    Object.keys(context.nodes).length <
-                      context.operationsLimit / 2,
-                    Object.keys(context.nodes).length,
-                    context.operationsLimit / 2
-                  )
+                  // console.log(
+                  // `not hit limit of node creation`,
+                  // Object.keys(context.nodes).length <
+                  // context.operationsLimit / 2,
+                  // Object.keys(context.nodes).length,
+                  // context.operationsLimit / 2
+                  // )
                   if (
                     Object.keys(context.nodes).length <
                     context.operationsLimit / 2
@@ -144,10 +135,7 @@ function createEngineMachine(context) {
                         verb: `create`,
                         rootUrl: context.rootUrl,
                         operators: context.operators,
-                      }),
-                      {
-                        // sync: true,
-                      }
+                      })
                     )
                     return [...context.operations, newOperation]
                   } else {
@@ -186,7 +174,6 @@ function createEngineMachine(context) {
       done: {
         type: `final`,
         entry: (context) => {
-          console.log(`I'm done`)
           const completedAt = Date.now()
           const runTime = completedAt - context.createdAt
 
@@ -221,7 +208,6 @@ function createEngineMachine(context) {
 
 // TODO Split into create & delete operations
 function createOperationMachine(context) {
-  console.log(`createOperationMachine`, context)
   return createMachine({
     id: `operation`,
     strict: true,
@@ -244,12 +230,11 @@ function createOperationMachine(context) {
         invoke: {
           id: `runOperation`,
           src: async (context) => {
-            console.log(`HELLO`)
             switch (context.verb) {
               case `create`:
-                console.log(context.operators.create)
+                // console.log(context.operators.create)
                 const res = await context.operators.create(context.id)
-                console.log(res)
+                // console.log(res)
                 const validation = createResSchema.validate(res)
                 if (validation.error) {
                   console.log(
@@ -321,7 +306,7 @@ function createOperationMachine(context) {
                     type: `FAILED_CHECK`,
                     res: { ...res, timestamp: Date.now() },
                   })
-                  await setTimeout(50)
+                  await setTimeout(100)
                 } else {
                   finished = true
                   callback({ type: `SUCCESS`, res })
@@ -416,9 +401,10 @@ const nodeMachine = createMachine({
   },
 })
 
-exports.run = (config) => {
+exports.run = (config, cb) => {
   const engineService = interpret(createEngineMachine(config)).onTransition(
-    (state) =>
+    (state) => {
+      cb(state)
       console.log(
         `engine transition`,
         state.value,
@@ -439,6 +425,7 @@ exports.run = (config) => {
         Object.keys(state.context.nodes).length,
         util.inspect(state.context.nodes, false, null, true)
       )
+    }
   )
 
   // Start the service

@@ -35,7 +35,7 @@ const config = {
   },
   operationsLimit: 4,
   interval: 2,
-}
+}.nodes
 
 const engineService = interpret(createEngineMachine(config)).onTransition(
   (state) => {
