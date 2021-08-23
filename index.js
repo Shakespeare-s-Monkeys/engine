@@ -217,7 +217,7 @@ function createOperationMachine(context) {
     id: `operation`,
     strict: true,
     initial: `running`,
-    context: { ...context, createdAt: Date.now(), checks: [], checkCount: 0 },
+    context: { ...context, checks: [], checkCount: 0 },
     states: {
       running: {
         entry: sendParent((context) => {
@@ -263,6 +263,7 @@ function createOperationMachine(context) {
                 node: (context, event) => {
                   return { ...event.data, ...context.node }
                 },
+                createdAt: Date.now(),
               }),
               sendParent((_, event) => {
                 const action = {
