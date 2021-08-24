@@ -1,54 +1,49 @@
-<p align="center">
-  <a href="https://www.gatsbyjs.com/?utm_source=starter&utm_medium=readme&utm_campaign=minimal-starter">
-    <img alt="Gatsby" src="https://www.gatsbyjs.com/Gatsby-Monogram.svg" width="60" />
-  </a>
-</p>
-<h1 align="center">
-  Gatsby minimal starter
-</h1>
+# Name TBD
 
-## 🚀 Quick start
+An simulation/e2e/load/fuzz/performance testing tool for Gatsby integrations.
 
-1.  **Create a Gatsby site.**
+Gatsby sites are distributed systems and TBD name is a framework for
+testing them.
 
-    Use the Gatsby CLI to create a new site, specifying the minimal starter.
+This tool lets you setup tests for specific Gatsby sites and integrations.
+You provide "operators" that when called, modify data on a backend. The
+engine then tests that these modifications correctly come through to the
+website and measure the latency.
 
-    ```shell
-    # create a new Gatsby site using the minimal starter
-    npm init gatsby
-    ```
+## How to use
 
-2.  **Start developing.**
+Install the package
 
-    Navigate into your new site’s directory and start it up.
+`yarn add shakespeares-monkey`
 
-    ```shell
-    cd my-gatsby-site/
-    npm run develop
-    ```
+Then import it into a test config file and run:
 
-3.  **Open the code and start customizing!**
+```
+// test.js
+const { run } = require(`shakespeares-monkey`)
 
-    Your site is now running at http://localhost:8000!
+const config = {...}
 
-    Edit `src/pages/index.js` to see your site update in real-time!
+run(config, (newState) => {
+  // This callback function is called whenever there's
+  // an update during running.
+  console.log(newState)
+})
+```
 
-4.  **Learn more**
+## Config options
 
-    - [Documentation](https://www.gatsbyjs.com/docs/?utm_source=starter&utm_medium=readme&utm_campaign=minimal-starter)
+- **operators**:
+  - **create**: an async function that creates a node in some backend. It's called with an auto-incrementing id (1,2,3,4,etc) for each operation. This is the id of the node that should be created.
+    - the create operator must return an object with the following fields.
+      - **pagePath**: the relative path for where the page for the created node
+      - **value**: A random value set on the node that will also be on the page. This is used by the engine to verify the change came through correctly.
+      - **selector**: the css selector for scraping the value from the HTML e.g. `#title` if the value is put into a `<div id="title">` element.
+      - **context**: Any additional information the test needs about the node to update or delete it later. E.g. the node's id on the backend.
+  - **delete**: an async function that deletes a node in some backend. It's called with the node object.
+  - **update**: not yet supported.
+- **rootUrl**: The URL of the site that the engine will check for the deployment of the result of an operation. 
+- **operationsLimit**: How many operations to run.
+- **interval**: The cadence on which the engine will schedule operations.
 
-    - [Tutorials](https://www.gatsbyjs.com/tutorial/?utm_source=starter&utm_medium=readme&utm_campaign=minimal-starter)
-
-    - [Guides](https://www.gatsbyjs.com/tutorial/?utm_source=starter&utm_medium=readme&utm_campaign=minimal-starter)
-
-    - [API Reference](https://www.gatsbyjs.com/docs/api-reference/?utm_source=starter&utm_medium=readme&utm_campaign=minimal-starter)
-
-    - [Plugin Library](https://www.gatsbyjs.com/plugins?utm_source=starter&utm_medium=readme&utm_campaign=minimal-starter)
-
-    - [Cheat Sheet](https://www.gatsbyjs.com/docs/cheat-sheet/?utm_source=starter&utm_medium=readme&utm_campaign=minimal-starter)
-
-## 🚀 Quick start (Gatsby Cloud)
-
-Deploy this starter with one click on [Gatsby Cloud](https://www.gatsbyjs.com/cloud/):
-
-[<img src="https://www.gatsbyjs.com/deploynow.svg" alt="Deploy to Gatsby Cloud">](https://www.gatsbyjs.com/dashboard/deploynow?url=https://github.com/gatsbyjs/gatsby-starter-minimal)
+See the examples folder for sample test code.
