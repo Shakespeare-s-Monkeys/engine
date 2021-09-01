@@ -1,7 +1,7 @@
 {
   "name": "shakespeares-monkeys",
   "description": "Engine for Shakespeare's Monkeys",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "author": "Kyle Mathews",
   "dependencies": {
     "asciichart": "^1.5.25",

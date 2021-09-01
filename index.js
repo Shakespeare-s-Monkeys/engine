@@ -73,7 +73,8 @@ function createEngineMachine(context) {
       }
     })
     context.nodePoolMode = true
-    context.nodes = context.nodePool
+    context.nodes = {}
+    Object.entries(context.nodePool).forEach(([k, v]) => (context.nodes[k] = v))
   }
 
   return createMachine({
