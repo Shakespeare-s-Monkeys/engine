@@ -85,101 +85,87 @@ it(`can create nodes, check if they exist, and then delete nodes and check they'
   engineService.start()
 })
 
-// describe(`markdown files`, () => {
-// let childProcess
-// beforeAll(async () => {
-// console.log(`before all`)
-// await new Promise((resolve) => {
-// childProcess = execa.command(`npm run develop -- --port 8102`, {
-// cwd: path.join(__dirname, `__fixtures__/markdown`),
-// env: {
-// NODE_ENV: `development`,
-// },
-// all: true,
-// })
-// childProcess.all.on(`data`, (data) => {
-// console.log(data.toString())
-// if (data.toString().includes(`localhost`)) {
-// console.log(`it's ready`)
-// resolve()
-// }
-// })
-// })
+it.only(`can make updates to a pool of pre-existing nodes`, (done) => {
+  console.log(`hi`)
+  const nodes = new Set()
+  let serverCalled = false
+  let updateOperatorCallCount = 0
 
-// console.log(`beforeAll finished`)
-// })
+  // Create a local server to receive data from
+  const server = http.createServer((req, res) => {
+    serverCalled = true
+    const id = req.url.slice(1)
+    if (nodes.has(id)) {
+      res.writeHead(200)
+      res.end(`<div id="selectme">${req.url.slice(1)}</div>`)
+    } else {
+      res.writeHead(404).end()
+    }
+  })
 
-// afterAll(async () => {
-// childProcess.kill()
-// })
+  server.listen(8100)
 
-// it.only(`tests markdown file changes for a markdown blog running gatsby develop`, async (done) => {
-// console.log(`starting markdown test`)
+  async function updateOperator(id) {
+    nodes.add(id.toString())
+    updateOperatorCallCount += 1
+    return {
+      pagePath: `/${id}`,
+      selector: `#selectme`,
+      value: `${id}`,
+    }
+  }
 
-// async function createOperator(id) {
-// const newValue = Math.random()
-// await fs.writeFile(
-// `./src/pages/s-${id}.md`,
-// `---
-// title: "${newValue}"
-// ---
+  const config = {
+    rootUrl: `http://localhost:8100`,
+    operators: {
+      update: updateOperator,
+    },
+    nodePool: [
+      {
+        id: 1,
+      },
+      {
+        id: 2,
+      },
+      {
+        id: 3,
+      },
+    ],
+    operationsLimit: 5,
+    interval: 0.2,
+  }
 
-// sup`
-// )
+  const engineService = interpret(createEngineMachine(config)).onTransition(
+    (state) => {
+      if (state.changed) {
+        console.log(
+          state.event.type,
+          state.value,
+          state.context.operations.map((o) => o.state.context.id),
+          state.context.nodes
+        )
+      }
+      if (state.value === `done`) {
+        console.log(`DONE`, {
+          serverCalled,
+          updateOperatorCallCount,
+          nodes,
+          operationsLength: state.context.operations.length,
+          nodesLength: Object.values(state.context.nodes).length,
+        })
+        server.close()
+        expect(serverCalled).toBeTruthy()
+        expect(updateOperatorCallCount).toBe(5)
+        expect(state.context.operations.length).toBe(5)
+        expect(Object.values(state.context.nodes).length).toBe(3)
+        expect(
+          Object.values(state.context.nodes).some((node) => node.inFlight)
+        ).toBe(false)
+        done()
+      }
+    }
+  )
 
-// return {
-// selector: `#title`,
-// pagePath: `/s-${id}`,
-// value: newValue.toString(),
-// }
-// }
-
-// async function deleteOperator(id) {
-// await fs.unlink(`./src/pages/s-${id}.md`)
-
-// return
-// }
-
-// const config = {
-// rootUrl: `http://localhost:8102`,
-// operators: {
-// create: createOperator,
-// delete: deleteOperator,
-// },
-// operationsLimit: 4,
-// interval: 0.2,
-// }
-
-// const engineService = interpret(createEngineMachine(config)).onTransition(
-// (state) => {
-// if (state.value === `done`) {
-// // console.log(`DONE`)
-// // console.log({
-// // serverCalled,
-// // createOperatorCallCount,
-// // deleteOperatorCallCount,
-// // nodesSize: nodes.size,
-// // operationsLength: state.context.operations.length,
-// // inFlight: Object.values(state.context.nodes).some(
-// // (node) => node.inFlight
-// // ),
-// // })
-// // console.log(Object.values(state.context.nodes))
-// expect(serverCalled).toBeTruthy()
-// expect(createOperatorCallCount).toBe(2)
-// expect(deleteOperatorCallCount).toBe(2)
-// expect(nodes.size).toBe(0)
-// expect(state.context.operations.length).toBe(4)
-// expect(Object.values(state.context.nodes).length).toBe(2)
-// expect(
-// Object.values(state.context.nodes).some((node) => node.inFlight)
-// ).toBe(false)
-// done()
-// }
-// }
-// )
-
-// // Start the service
-// engineService.start()
-// }, 30000)
-// })
+  // Start the service
+  engineService.start()
+})

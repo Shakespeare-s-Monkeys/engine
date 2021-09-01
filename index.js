@@ -20,7 +20,7 @@ const createResSchema = Joi.object({
   pagePath: Joi.string().required(),
   selector: Joi.string().required(),
   value: Joi.any().required(),
-  context: Joi.object()
+  context: Joi.object(),
 })
 
 const checkIf404 = async ({ pagePath, rootUrl }) => {
@@ -62,6 +62,20 @@ function getNextId() {
 }
 
 function createEngineMachine(context) {
+  if (context.nodePool?.length > 0) {
+    // Set default values on the node pool.
+    context.nodePool = context.nodePool.map((n) => {
+      return {
+        inFlight: false,
+        existsOnCMS: true,
+        published: true,
+        ...n,
+      }
+    })
+    context.nodePoolMode = true
+    context.nodes = context.nodePool
+  }
+
   return createMachine({
     id: `engine`,
     strict: true,
@@ -73,6 +87,7 @@ function createEngineMachine(context) {
       operationsLimit: 20,
       rootUrl: ``,
       createdAt: Date.now(),
+      nodePool: [],
       ...context,
     },
     states: {
@@ -116,56 +131,70 @@ function createEngineMachine(context) {
               operations: (context) => {
                 // If we're past the limit, just return
                 if (context.operations.length < context.operationsLimit) {
-                  // If we haven't created all the nodes (1/2 of total operations),
-                  // create a node.
-
-                  // console.log(
-                  // `not hit limit of node creation`,
-                  // Object.keys(context.nodes).length <
-                  // context.operationsLimit / 2,
-                  // Object.keys(context.nodes).length,
-                  // context.operationsLimit / 2
-                  // )
-                  if (
-                    Object.keys(context.nodes).length <
-                    context.operationsLimit / 2
-                  ) {
-                    const id = getNextId()
-                    const newOperation = spawn(
-                      createOperationMachine({
-                        id: `create-${id}`,
-                        node: {
-                          id,
-                        },
-                        verb: `create`,
-                        rootUrl: context.rootUrl,
-                        operators: context.operators,
-                      })
+                  // If there's a nodePool, try picking a non-inflight node from
+                  // there to update.
+                  if (context.nodePoolMode) {
+                    const nodeToUpdate = Object.values(context.nodes).find(
+                      (n) => n.inFlight === false
                     )
-                    return [...context.operations, newOperation]
-                  } else {
-                    // We need to start deleting. If there's a created node,
-                    // delete it, otherwise wait for the next tick.
-                    const nodesToDelete = _.pickBy(
-                      context.nodes,
-                      (node) => node.published && !node.inFlight
-                    )
-                    if (!_.isEmpty(nodesToDelete)) {
-                      const nodeToDelete =
-                        nodesToDelete[Object.keys(nodesToDelete)[0]]
-
+                    if (nodeToUpdate) {
+                      const id = getNextId()
                       const newOperation = spawn(
                         createOperationMachine({
-                          id: `delete-${nodeToDelete.id}`,
-                          verb: `delete`,
+                          id: `update-${id}`,
+                          node: nodeToUpdate,
+                          verb: `update`,
                           rootUrl: context.rootUrl,
-                          node: nodeToDelete,
+                          operators: context.operators,
+                        })
+                      )
+                      return [...context.operations, newOperation]
+                    }
+                    return context.operations
+                  } else {
+                    // If we haven't created all the nodes (1/2 of total operations),
+                    // create a node.
+                    if (
+                      Object.keys(context.nodes).length <
+                      context.operationsLimit / 2
+                    ) {
+                      const id = getNextId()
+                      const newOperation = spawn(
+                        createOperationMachine({
+                          id: `create-${id}`,
+                          node: {
+                            id,
+                          },
+                          verb: `create`,
+                          rootUrl: context.rootUrl,
                           operators: context.operators,
                         })
                       )
                       return [...context.operations, newOperation]
                     } else {
-                      return context.operations
+                      // We need to start deleting. If there's a created node,
+                      // delete it, otherwise wait for the next tick.
+                      const nodesToDelete = _.pickBy(
+                        context.nodes,
+                        (node) => node.published && !node.inFlight
+                      )
+                      if (!_.isEmpty(nodesToDelete)) {
+                        const nodeToDelete =
+                          nodesToDelete[Object.keys(nodesToDelete)[0]]
+
+                        const newOperation = spawn(
+                          createOperationMachine({
+                            id: `delete-${nodeToDelete.id}`,
+                            verb: `delete`,
+                            rootUrl: context.rootUrl,
+                            node: nodeToDelete,
+                            operators: context.operators,
+                          })
+                        )
+                        return [...context.operations, newOperation]
+                      } else {
+                        return context.operations
+                      }
                     }
                   }
                 } else {
@@ -235,25 +264,31 @@ function createOperationMachine(context) {
         invoke: {
           id: `runOperation`,
           src: async (context) => {
-            switch (context.verb) {
-              case `create`:
-                // console.log(context.operators.create)
-                const res = await context.operators.create(context.node.id)
-                // console.log(res)
-                const validation = createResSchema.validate(res)
-                if (validation.error) {
-                  console.log(
-                    `create operator response failed validation`,
-                    validation
-                  )
-                  process.exit(1)
-                }
-                return res
-              case `delete`:
-                await context.operators.delete(context.node)
-                return context.node
-              default:
-              // code block
+            if (context.verb === `create`) {
+              const res = await context.operators.create(context.node.id)
+              const validation = createResSchema.validate(res)
+              if (validation.error) {
+                console.log(
+                  `create operator response failed validation`,
+                  validation
+                )
+                process.exit(1)
+              }
+              return res
+            } else if (context.verb === `update`) {
+              const updateRes = await context.operators.update(context.node.id)
+              const validation = createResSchema.validate(updateRes)
+              if (validation.error) {
+                console.log(
+                  `update operator response failed validation`,
+                  validation
+                )
+                process.exit(1)
+              }
+              return updateRes
+            } else if (context.verb === `delete`) {
+              await context.operators.delete(context.node)
+              return context.node
             }
           },
           onDone: {
@@ -297,7 +332,7 @@ function createOperationMachine(context) {
           src: (context, event) => async (callback, onReceive) => {
             let finished = false
             while (!finished) {
-              if (context.verb === `create`) {
+              if (context.verb === `create` || context.verb === `update`) {
                 const res = await checkIfDeployed({
                   selector: context.node.selector,
                   pagePath: context.node.pagePath,
@@ -327,7 +362,7 @@ function createOperationMachine(context) {
                     type: `FAILED_CHECK`,
                     res: { ...res, timestamp: Date.now() },
                   })
-                  await setTimeout(50)
+                  await setTimeout(100)
                 } else {
                   finished = true
                   callback({ type: `SUCCESS`, res })
@@ -411,26 +446,6 @@ exports.run = (config, cb) => {
   const engineService = interpret(createEngineMachine(config)).onTransition(
     (state) => {
       cb(state)
-      // console.log(
-        // `engine transition`,
-        // state.value,
-        // state.event.type,
-        // `operations`,
-        // util.inspect(
-          // state.context.operations.map((o) => {
-            // return {
-              // value: o.state.value,
-              // // context: o.state.context,
-            // }
-          // }),
-          // false,
-          // null,
-          // true [> enable colors <]
-        // ),
-        // `nodes`,
-        // Object.keys(state.context.nodes).length,
-        // util.inspect(state.context.nodes, false, null, true)
-      // )
     }
   )
 
