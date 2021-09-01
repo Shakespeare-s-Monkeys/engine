@@ -4,6 +4,7 @@ const { interpret } = require(`xstate`)
 const fs = require(`fs-extra`)
 const execa = require(`execa`)
 const path = require(`path`)
+const { setTimeout } = require(`timers/promises`)
 
 it(`can create nodes, check if they exist, and then delete nodes and check they're gone`, (done) => {
   const nodes = new Set()
@@ -108,6 +109,7 @@ it(`can make updates to a pool of pre-existing nodes`, (done) => {
     const id = node.id
     nodes.add(id.toString())
     updateOperatorCallCount += 1
+    await setTimeout(110)
     return {
       pagePath: `/${id}`,
       selector: `#selectme`,
@@ -132,7 +134,7 @@ it(`can make updates to a pool of pre-existing nodes`, (done) => {
       },
     ],
     operationsLimit: 5,
-    interval: 0.2,
+    interval: 0.1,
   }
 
   const engineService = interpret(createEngineMachine(config)).onTransition(
@@ -141,7 +143,12 @@ it(`can make updates to a pool of pre-existing nodes`, (done) => {
         console.log(
           state.event.type,
           state.value,
-          state.context.operations.map((o) => o.state.context.id),
+          state.context.operations.map((o) => {
+            return {
+              opId: o.state.context.id,
+              nodeId: o.state.context.node?.id,
+            }
+          }),
           state.context.nodes
         )
       }

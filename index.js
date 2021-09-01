@@ -74,7 +74,7 @@ function createEngineMachine(context) {
     })
     context.nodePoolMode = true
     context.nodes = {}
-    Object.entries(context.nodePool).forEach(([k, v]) => (context.nodes[k] = v))
+    context.nodePool.forEach((n) => (context.nodes[n.id] = n))
   }
 
   return createMachine({
@@ -297,7 +297,7 @@ function createOperationMachine(context) {
             actions: [
               assign({
                 node: (context, event) => {
-                  return { ...event.data, ...context.node }
+                  return { ...context.node, ...event.data }
                 },
                 createdAt: Date.now(),
               }),
@@ -305,8 +305,8 @@ function createOperationMachine(context) {
                 const action = {
                   type: `NODE_UPDATED`,
                   node: {
-                    ...event.data,
                     ...context.node,
+                    ...event.data,
                     inFlight: true,
                     existsOnCMS: context.verb == `create` ? true : false,
                     published: context.verb == `create` ? false : true,
