@@ -276,7 +276,7 @@ function createOperationMachine(context) {
               }
               return res
             } else if (context.verb === `update`) {
-              const updateRes = await context.operators.update(context.node.id)
+              const updateRes = await context.operators.update(context.node)
               const validation = createResSchema.validate(updateRes)
               if (validation.error) {
                 console.log(

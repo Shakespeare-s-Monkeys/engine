@@ -85,8 +85,7 @@ it(`can create nodes, check if they exist, and then delete nodes and check they'
   engineService.start()
 })
 
-it.only(`can make updates to a pool of pre-existing nodes`, (done) => {
-  console.log(`hi`)
+it(`can make updates to a pool of pre-existing nodes`, (done) => {
   const nodes = new Set()
   let serverCalled = false
   let updateOperatorCallCount = 0
@@ -105,7 +104,8 @@ it.only(`can make updates to a pool of pre-existing nodes`, (done) => {
 
   server.listen(8100)
 
-  async function updateOperator(id) {
+  async function updateOperator(node) {
+    const id = node.id
     nodes.add(id.toString())
     updateOperatorCallCount += 1
     return {
